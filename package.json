@@ -1,0 +1,12 @@
+{
+  "name": "pobrecase",
+  "version": "3.5.0",
+  "description": "PobreCase PRO 3.5 — Gerador Paramétrico de Caixas com Dobradiças Laser e CNC",
+  "main": "serve.cjs",
+  "scripts": {
+    "start": "node serve.cjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

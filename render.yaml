@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pobrecase
+    runtime: node
+    plan: free
+    buildCommand: echo "PobreCase PRO 3.5 ready"
+    startCommand: node serve.cjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20
