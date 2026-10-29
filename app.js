@@ -916,46 +916,54 @@
   // MOTOR GEOMÉTRICO 2: POLIGONAL (3 A 10 LADOS) & CANTOS CURVOS
   // ==========================================================================
 
-  // Gera os dentes da tampa/fundo poligonal (dentes machos apenas nos segmentos ímpares centrais para não colidir nos vértices)
-  function generateEdgePoints(pStart, pEnd, edgeType, targetTabSize, thickness, kerf) {
-    const dx = pEnd.x - pStart.x;
-    const dy = pEnd.y - pStart.y;
-    const length = Math.hypot(dx, dy);
+  // Gera o contorno de uma aresta da tampa/fundo poligonal alinhada à face EXTERNA das paredes:
+  // Cantos (vértices do polígono) ficam 100% fechados em P_out, e os segmentos ímpares centrais têm cavas fêmea (-T para dentro) que recebem os dentes machos das paredes
+  function generatePolyCapEdgePoints(pOutStart, pOutEnd, sideLen, fingerDepth, targetTabSize, thickness, kerf) {
+    const dx = pOutEnd.x - pOutStart.x;
+    const dy = pOutEnd.y - pOutStart.y;
+    const wallWidth = Math.hypot(dx, dy);
 
-    if (edgeType === 'flat' || state.jointType === 'flat') {
-      return [pStart, pEnd];
+    if (state.jointType === 'flat') {
+      return [pOutStart, pOutEnd];
     }
 
-    const ux = dx / length;
-    const uy = dy / length;
-    const nx = uy;
-    const ny = -ux;
+    const ux = dx / wallWidth;
+    const uy = dy / wallWidth;
+    // Vetor apontando PARA DENTRO do polígono (sentido CCW: (-uy, ux))
+    const inNx = -uy;
+    const inNy = ux;
 
-    let count = Math.max(3, Math.round(length / targetTabSize));
-    if (count % 2 === 0) count += 1;
-
-    const segLen = length / count;
-    const points = [];
+    let countW = Math.max(3, Math.round(sideLen / targetTabSize));
+    if (countW % 2 === 0) countW += 1;
+    const segW = sideLen / countW;
     const kHalf = kerf / 2;
 
-    for (let i = 0; i < count; i++) {
-      // Segmentos ímpares (meio da aresta) saem como dente macho (+T); cantos (i=0 e i=count-1) ficam na linha interna
-      const isTab = (edgeType === 'male') ? (i % 2 === 1) : (i % 2 === 0);
-      const s0 = i * segLen;
-      const s1 = (i + 1) * segLen;
+    const points = [];
+    // Começa exatamente no vértice externo do polígono (quina viva 100% fechada)
+    points.push({ x: pOutStart.x, y: pOutStart.y });
 
-      let adj0 = isTab ? (s0 - kHalf) : ((i === 0) ? 0 : s0 + kHalf);
-      let adj1 = isTab ? (s1 + kHalf) : ((i === count - 1) ? length : s1 - kHalf);
-      const offsetDist = isTab ? thickness : 0;
-
-      points.push({ x: pStart.x + ux * adj0 + nx * offsetDist, y: pStart.y + uy * adj0 + ny * offsetDist });
-      points.push({ x: pStart.x + ux * adj1 + nx * offsetDist, y: pStart.y + uy * adj1 + ny * offsetDist });
+    for (let i = 0; i < countW; i++) {
+      const s0 = fingerDepth + i * segW;
+      const s1 = fingerDepth + (i + 1) * segW;
+      const isNotch = (i % 2 === 1); // Cavas fêmea nos segmentos ímpares centrais
+      if (isNotch) {
+        const a0 = s0 + kHalf;
+        const a1 = s1 - kHalf;
+        points.push({ x: pOutStart.x + ux * a0, y: pOutStart.y + uy * a0 });
+        points.push({ x: pOutStart.x + ux * a0 + inNx * thickness, y: pOutStart.y + uy * a0 + inNy * thickness });
+        points.push({ x: pOutStart.x + ux * a1 + inNx * thickness, y: pOutStart.y + uy * a1 + inNy * thickness });
+        points.push({ x: pOutStart.x + ux * a1, y: pOutStart.y + uy * a1 });
+      }
     }
 
-    return cleanPolygonPoints(points);
+    // Termina exatamente no próximo vértice externo do polígono
+    points.push({ x: pOutEnd.x, y: pOutEnd.y });
+    return points;
   }
 
-  // Constrói a parede lateral exata do polígono de N lados com projeção trigonométrica nos cantos
+  // Constrói a parede lateral exata do polígono de N lados:
+  // - Topo e Base: corpo apoia sob a tampa/fundo (y = T até y = H - T) e dentes machos centrais (i ímpar) sobem até y = H e descem até y = 0
+  // - Laterais Esquerda e Direita: dentes intercalados entre y = T e y = H - T com projeção trigonométrica fingerDepth
   function buildPolyWallPolygon(sideLen, H, fingerDepth, hasLid, targetTabSize, thickness, kerf) {
     if (state.jointType === 'flat') {
       return [
@@ -971,9 +979,13 @@
     if (countW % 2 === 0) countW += 1;
     const segW = sideLen / countW;
 
-    let countH = Math.max(3, Math.round(H / targetTabSize));
+    const yBotBase = thickness;
+    const yTopBase = hasLid ? (H - thickness) : H;
+    const vertSpan = yTopBase - yBotBase;
+
+    let countH = Math.max(3, Math.round(vertSpan / targetTabSize));
     if (countH % 2 === 0) countH += 1;
-    const segH = H / countH;
+    const segH = vertSpan / countH;
 
     const xInnerLeft = fingerDepth;
     const xInnerRight = fingerDepth + sideLen;
@@ -982,66 +994,72 @@
 
     const pts = [];
 
-    // 1. Aresta Inferior (X: xInnerLeft -> xInnerRight)
-    // Ímpares têm cava fêmea (y = thickness) para receber o dente macho da base poligonal
+    // 1. Aresta Inferior (da esquerda para a direita)
+    // A base da parede começa em y = T; dentes machos nos segmentos ímpares descem até y = 0 para entrar nas cavas do fundo
+    pts.push({ x: xOuterLeft, y: yBotBase });
     for (let i = 0; i < countW; i++) {
       const x0 = xInnerLeft + i * segW;
       const x1 = xInnerLeft + (i + 1) * segW;
-      const isSlot = (i % 2 === 1);
-      if (isSlot) {
-        pts.push({ x: x0 + kHalf, y: 0 });
-        pts.push({ x: x0 + kHalf, y: thickness });
-        pts.push({ x: x1 - kHalf, y: thickness });
-        pts.push({ x: x1 - kHalf, y: 0 });
-      } else {
-        pts.push({ x: x0, y: 0 });
-        pts.push({ x: x1, y: 0 });
+      const isMaleTooth = (i % 2 === 1);
+      if (isMaleTooth) {
+        const ax0 = x0 - kHalf;
+        const ax1 = x1 + kHalf;
+        pts.push({ x: ax0, y: yBotBase });
+        pts.push({ x: ax0, y: 0 });
+        pts.push({ x: ax1, y: 0 });
+        pts.push({ x: ax1, y: yBotBase });
       }
     }
+    pts.push({ x: xOuterRight, y: yBotBase });
 
-    // 2. Aresta Lateral Direita (Y: 0 -> H) — Macho nos pares (j = 0, 2, 4...)
+    // 2. Aresta Lateral Direita (Y: yBotBase -> yTopBase) — Dentes machos nos pares (j = 0, 2, 4...)
     for (let j = 0; j < countH; j++) {
-      const y0 = j * segH;
-      const y1 = (j + 1) * segH;
+      const y0 = yBotBase + j * segH;
+      const y1 = yBotBase + (j + 1) * segH;
       const isTab = (j % 2 === 0);
       if (isTab) {
-        const ay0 = (j === 0) ? 0 : y0 - kHalf;
-        const ay1 = (j === countH - 1) ? H : y1 + kHalf;
-        pts.push({ x: xInnerRight, y: ay0 });
+        const ay0 = (j === 0) ? yBotBase : y0 - kHalf;
+        const ay1 = (j === countH - 1) ? yTopBase : y1 + kHalf;
         pts.push({ x: xOuterRight, y: ay0 });
         pts.push({ x: xOuterRight, y: ay1 });
-        pts.push({ x: xInnerRight, y: ay1 });
+        if (j < countH - 1) {
+          pts.push({ x: xInnerRight, y: ay1 });
+        }
       } else {
-        pts.push({ x: xInnerRight, y: y0 + kHalf });
-        pts.push({ x: xInnerRight, y: y1 - kHalf });
+        const ay0 = y0 + kHalf;
+        const ay1 = y1 - kHalf;
+        pts.push({ x: xInnerRight, y: ay0 });
+        pts.push({ x: xInnerRight, y: ay1 });
+        pts.push({ x: xOuterRight, y: ay1 });
       }
     }
 
-    // 3. Aresta Superior (X: xInnerRight -> xInnerLeft)
+    // 3. Aresta Superior (da direita para a esquerda)
     if (!hasLid) {
-      pts.push({ x: xInnerRight, y: H });
-      pts.push({ x: xInnerLeft, y: H });
+      pts.push({ x: xOuterRight, y: H });
+      pts.push({ x: xOuterLeft, y: H });
     } else {
+      pts.push({ x: xOuterRight, y: yTopBase });
       for (let i = countW - 1; i >= 0; i--) {
         const x0 = xInnerLeft + i * segW;
         const x1 = xInnerLeft + (i + 1) * segW;
-        const isSlot = (i % 2 === 1);
-        if (isSlot) {
-          pts.push({ x: x1 - kHalf, y: H });
-          pts.push({ x: x1 - kHalf, y: H - thickness });
-          pts.push({ x: x0 + kHalf, y: H - thickness });
-          pts.push({ x: x0 + kHalf, y: H });
-        } else {
-          pts.push({ x: x1, y: H });
-          pts.push({ x: x0, y: H });
+        const isMaleTooth = (i % 2 === 1);
+        if (isMaleTooth) {
+          const ax1 = x1 + kHalf;
+          const ax0 = x0 - kHalf;
+          pts.push({ x: ax1, y: yTopBase });
+          pts.push({ x: ax1, y: H });
+          pts.push({ x: ax0, y: H });
+          pts.push({ x: ax0, y: yTopBase });
         }
       }
+      pts.push({ x: xInnerLeft, y: yTopBase });
     }
 
-    // 4. Aresta Lateral Esquerda (Y: H -> 0) — Macho nos ímpares (j = 1, 3...) para casar com os pares da parede vizinha
+    // 4. Aresta Lateral Esquerda (Y: yTopBase -> yBotBase) — Dentes machos nos ímpares (j = 1, 3...)
     for (let j = countH - 1; j >= 0; j--) {
-      const y0 = j * segH;
-      const y1 = (j + 1) * segH;
+      const y0 = yBotBase + j * segH;
+      const y1 = yBotBase + (j + 1) * segH;
       const isTab = (j % 2 === 1);
       if (isTab) {
         const ay1 = y1 + kHalf;
@@ -1069,23 +1087,24 @@
     const sideLen = 2 * R * Math.sin(Math.PI / N);
     const fingerDepth = (state.jointType === 'flat') ? 0 : T * Math.tan(Math.PI / N);
     const wallWidth = sideLen + 2 * fingerDepth;
+    const rOut = R + T / Math.cos(Math.PI / N);
 
-    const baseVertices = [];
+    const outerVertices = [];
     for (let i = 0; i < N; i++) {
       const angle = (i * 2 * Math.PI) / N;
-      baseVertices.push({ x: R + R * Math.cos(angle), y: R + R * Math.sin(angle) });
+      outerVertices.push({ x: rOut + rOut * Math.cos(angle), y: rOut + rOut * Math.sin(angle) });
     }
 
     const polyContour = [];
     for (let i = 0; i < N; i++) {
-      const p1 = baseVertices[i];
-      const p2 = baseVertices[(i + 1) % N];
-      const edgePts = generateEdgePoints(p1, p2, 'male', tabSize, T, K);
+      const p1 = outerVertices[i];
+      const p2 = outerVertices[(i + 1) % N];
+      const edgePts = generatePolyCapEdgePoints(p1, p2, sideLen, fingerDepth, tabSize, T, K);
       edgePts.forEach(pt => polyContour.push(pt));
     }
 
     const wallPolygon = buildPolyWallPolygon(sideLen, H, fingerDepth, state.hasLid !== false, tabSize, T, K);
-    return { N, R, H, T, sideLen, fingerDepth, wallWidth, baseVertices, polyContour, wallPolygon };
+    return { N, R, rOut, H, T, sideLen, fingerDepth, wallWidth, outerVertices, polyContour: cleanPolygonPoints(polyContour), wallPolygon };
   }
 
   function getHingeData() {
@@ -1365,13 +1384,13 @@
     // --- MODO 2: CAIXA POLIGONAL ---
     else if (state.boxModel === 'poly') {
       const poly = getPolyData();
-      const { N, R, H, T, wallWidth, polyContour, wallPolygon } = poly;
+      const { N, R, rOut, H, T, wallWidth, polyContour, wallPolygon } = poly;
 
       const polyCaps = state.hasLid ? ['bottom', 'top'] : ['bottom'];
       polyCaps.forEach(type => {
         const shape = new THREE.Shape();
-        shape.moveTo(polyContour[0].x - R, polyContour[0].y - R);
-        for (let i = 1; i < polyContour.length; i++) shape.lineTo(polyContour[i].x - R, polyContour[i].y - R);
+        shape.moveTo(polyContour[0].x - rOut, polyContour[0].y - rOut);
+        for (let i = 1; i < polyContour.length; i++) shape.lineTo(polyContour[i].x - rOut, polyContour[i].y - rOut);
         shape.closePath();
 
         const geom = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false });
@@ -1533,10 +1552,10 @@
     // --- 2. POLIGONAL ---
     else if (state.boxModel === 'poly') {
       const poly = getPolyData();
-      const { N, R, H, wallWidth, polyContour, wallPolygon } = poly;
-      items.push({ id: 'poly-bottom', name: `Fundo (${N} Lados)`, width: 2 * R, height: 2 * R, polygon: polyContour, holes: [], isDivider: false });
+      const { N, rOut, H, wallWidth, polyContour, wallPolygon } = poly;
+      items.push({ id: 'poly-bottom', name: `Fundo (${N} Lados)`, width: 2 * rOut, height: 2 * rOut, polygon: polyContour, holes: [], isDivider: false });
       if (state.hasLid) {
-        items.push({ id: 'poly-top', name: `Tampa (${N} Lados)`, width: 2 * R, height: 2 * R, polygon: polyContour, holes: [], isDivider: false });
+        items.push({ id: 'poly-top', name: `Tampa (${N} Lados)`, width: 2 * rOut, height: 2 * rOut, polygon: polyContour, holes: [], isDivider: false });
       }
       for (let i = 1; i <= N; i++) {
         items.push({ id: `poly-wall-${i}`, name: `Parede #${i}`, width: wallWidth, height: H, polygon: wallPolygon, holes: [], isDivider: false });
