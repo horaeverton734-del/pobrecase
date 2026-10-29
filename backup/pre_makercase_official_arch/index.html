@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PobreCase PRO 3.5 — Gerador Paramétrico de Caixas com Dobradiças Laser e CNC</title>
+  <meta name="description" content="Gere caixas para corte a laser com tampa articulada (dobradiça com pinos), dobradiça flexível (living hinge), encaixes denteados e T-Slots com visualização 3D e exportação SVG, DXF e PDF.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Three.js e OrbitControls via CDN confiável -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- jsPDF via CDN para exportação de PDF vetorial -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- TOP HEADER -->
+    <header class="app-header">
+      <div class="brand-container">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          <span class="laser-beam"></span>
+        </div>
+        <div>
+          <h1 class="brand-title">PobreCase <span class="badge">PRO 3.5</span></h1>
+          <p class="brand-tagline">Caixas com Dobradiças Articuladas & Living Hinge</p>
+        </div>
+      </div>
+
+      <!-- VIEW TOGGLES -->
+      <div class="view-switch-group">
+        <button id="tab-btn-3d" class="view-toggle-btn active" title="Visualização 3D da Caixa Montada">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+          <span>Visualização 3D</span>
+        </button>
+        <button id="tab-btn-2d" class="view-toggle-btn" title="Planificação 2D das Peças na Chapa">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          <span>Chapa 2D (Corte)</span>
+        </button>
+      </div>
+
+      <!-- ACTION BUTTONS -->
+      <div class="header-actions">
+        <button id="btn-export-svg" class="btn btn-primary" title="Exportar arquivo vetorial SVG pronto para Laser">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Baixar SVG</span>
+        </button>
+        <button id="btn-export-dxf" class="btn btn-secondary" title="Exportar DXF para AutoCAD, Corel e CNC">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span>Baixar DXF</span>
+        </button>
+        <button id="btn-export-pdf" class="btn btn-accent" title="Exportar PDF vetorial pronto para impressão">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <path d="M6 14h12v8H6z"></path>
+          </svg>
+          <span>Baixar PDF</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <!-- SIDEBAR CONTROLS -->
+      <aside class="sidebar" id="sidebar-controls">
+        
+        <!-- CARD: TIPO DE CAIXA -->
+        <section class="control-card model-selector-card">
+          <div class="card-header">
+            <h3>Tipo de Caixa</h3>
+            <span class="unit-badge">Modelo</span>
+          </div>
+          <div class="box-model-grid">
+            <label class="model-pill">
+              <input type="radio" name="boxType" value="bau_pinos" checked
+                     data-model="rect" data-w="140" data-h="70" data-d="100" data-t="3" data-haslid="yes" data-lid="pin_hinge">
+              <div class="model-content">
+                <span class="model-icon">🚪</span>
+                <span class="model-title">Baú com Dobradiça Articulada (Pinos)</span>
+                <span class="model-sub">140 × 70 × 100 mm • Tampa Articulada</span>
+              </div>
+            </label>
+            <label class="model-pill">
+              <input type="radio" name="boxType" value="caixa_padrao"
+                     data-model="rect" data-w="120" data-h="80" data-d="100" data-t="3" data-haslid="yes" data-lid="removable">
+              <div class="model-content">
+                <span class="model-icon">📦</span>
+                <span class="model-title">Caixa Padrão (Tampa Encaixe)</span>
+                <span class="model-sub">120 × 80 × 100 mm • Tampa Removível</span>
+              </div>
+            </label>
+            <label class="model-pill">
+              <input type="radio" name="boxType" value="organizador_aberto"
+                     data-model="rect" data-w="150" data-h="60" data-d="100" data-t="3" data-haslid="no">
+              <div class="model-content">
+                <span class="model-icon">📭</span>
+                <span class="model-title">Organizador Aberto (Sem Tampa)</span>
+                <span class="model-sub">150 × 60 × 100 mm • Nicho / Gaveteiro</span>
+              </div>
+            </label>
+            <label class="model-pill">
+              <input type="radio" name="boxType" value="poligonal"
+                     data-model="poly" data-sides="6" data-radius="60" data-h="75" data-t="3">
+              <div class="model-content">
+                <span class="model-icon">⬡</span>
+                <span class="model-title">Hexágono para Dados (6 Lados)</span>
+                <span class="model-sub">Raio 60 mm, Altura 75 mm • Polígono (3-10 lados)</span>
+              </div>
+            </label>
+            <label class="model-pill">
+              <input type="radio" name="boxType" value="cantos_curvos"
+                     data-model="hinge" data-w="140" data-h="65" data-d="90" data-radius="20" data-t="3">
+              <div class="model-content">
+                <span class="model-icon">🔄</span>
+                <span class="model-title">Estojo Cantos Curvos (Living Hinge)</span>
+                <span class="model-sub">140 × 65 × 90 mm, raio 20 mm • Madeira Flexível</span>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <!-- CARD: TIPO DE TAMPA & DOBRADIÇA (O MAIS IMPORTANTE!) -->
+        <section class="control-card" id="card-lid-hinge">
+          <div class="card-header">
+            <h3>Tampa & Dobradiça</h3>
+            <span class="unit-badge highlight-badge">Articulação</span>
+          </div>
+
+          <!-- SELETOR PRINCIPAL: COM OU SEM TAMPA -->
+          <div class="input-row">
+            <label class="field-title">Incluir Tampa na Caixa?</label>
+            <div class="segmented-control" id="seg-has-lid">
+              <label class="segment-option">
+                <input type="radio" name="hasLid" value="yes" checked>
+                <span>📦 Com Tampa</span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="hasLid" value="no">
+                <span>📭 Sem Tampa (Aberta)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SUB-OPÇÕES: MECANISMO DA TAMPA (QUANDO COM TAMPA) -->
+          <div class="input-row" id="group-lid-type">
+            <label class="field-title">Mecanismo da Tampa:</label>
+            <div class="segmented-control vertical-segmented">
+              <label class="segment-option">
+                <input type="radio" name="lidType" value="pin_hinge" checked>
+                <span>🚪 Dobradiça Articulada (com Pinos/Eixo)</span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="lidType" value="living_hinge">
+                <span>📜 Dobradiça Flexível Contínua (Living Hinge)</span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="lidType" value="removable">
+                <span>📦 Tampa Removível (Encaixe Simples)</span>
+              </label>
+            </div>
+            <span class="helper-text" id="lid-helper-text">A tampa tem abas traseiras com furos para pino/parafuso M3, permitindo abrir e fechar livremente.</span>
+          </div>
+        </section>
+
+        <!-- CARD: PARÂMETROS DA CAIXA RETANGULAR -->
+        <section class="control-card" id="card-params-rect">
+          <div class="card-header">
+            <h3>Dimensões Retangulares</h3>
+            <span class="unit-badge">mm</span>
+          </div>
+
+          <div class="segmented-control">
+            <label class="segment-option">
+              <input type="radio" name="dimType" value="outside" checked>
+              <span>Medida Externa</span>
+            </label>
+            <label class="segment-option">
+              <input type="radio" name="dimType" value="inside">
+              <span>Medida Interna</span>
+            </label>
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-width">Largura (X):</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-width" min="30" max="600" value="140" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-width" min="30" max="500" value="140" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-height">Altura (Y):</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-height" min="30" max="600" value="70" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-height" min="30" max="500" value="70" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-depth">Profundidade (Z):</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-depth" min="30" max="600" value="100" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-depth" min="30" max="500" value="100" step="1" class="slider">
+          </div>
+        </section>
+
+        <!-- CARD: PARÂMETROS POLIGONAL -->
+        <section class="control-card" id="card-params-poly" style="display: none;">
+          <div class="card-header">
+            <h3>Parâmetros do Polígono</h3>
+            <span class="unit-badge" id="poly-name-badge">Hexágono</span>
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-poly-sides">Quantidade de Lados:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-poly-sides" min="3" max="10" value="6" step="1">
+                <span class="input-unit">lados</span>
+              </div>
+            </div>
+            <input type="range" id="range-poly-sides" min="3" max="10" value="6" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-poly-radius">Raio do Polígono:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-poly-radius" min="25" max="300" value="60" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-poly-radius" min="25" max="250" value="60" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-poly-height">Altura da Caixa:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-poly-height" min="30" max="400" value="75" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-poly-height" min="30" max="300" value="75" step="1" class="slider">
+          </div>
+        </section>
+
+        <!-- CARD: PARÂMETROS CANTOS CURVOS -->
+        <section class="control-card" id="card-params-hinge" style="display: none;">
+          <div class="card-header">
+            <h3>Cantos Curvos (Living Hinge)</h3>
+            <span class="unit-badge">Laser Flex</span>
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-hinge-w">Largura da Caixa:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-hinge-w" min="50" max="500" value="140" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-hinge-w" min="50" max="400" value="140" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-hinge-h">Altura da Caixa:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-hinge-h" min="30" max="400" value="65" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-hinge-h" min="30" max="300" value="65" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-hinge-d">Profundidade da Caixa:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-hinge-d" min="50" max="500" value="90" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-hinge-d" min="50" max="400" value="90" step="1" class="slider">
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-hinge-radius">Raio da Curvatura:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-hinge-radius" min="10" max="60" value="20" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-hinge-radius" min="10" max="50" value="20" step="1" class="slider">
+          </div>
+        </section>
+
+        <!-- CARD: MATERIAL & ENCAIXES -->
+        <section class="control-card">
+          <div class="card-header">
+            <h3>Material & Encaixes</h3>
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-thickness">Espessura da Chapa:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-thickness" min="1.0" max="25.0" value="3.0" step="0.1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <div class="chips-row">
+              <button class="chip" data-thickness="2.5">2.5 mm</button>
+              <button class="chip active" data-thickness="3.0">3.0 mm (MDF)</button>
+              <button class="chip" data-thickness="4.0">4.0 mm</button>
+              <button class="chip" data-thickness="6.0">6.0 mm</button>
+            </div>
+          </div>
+
+          <div class="input-row" id="group-joint-types">
+            <label class="field-title">Tipo de Junção de Cantos:</label>
+            <div class="segmented-control vertical-segmented">
+              <label class="segment-option">
+                <input type="radio" name="jointType" value="finger" checked>
+                <span>🏰 Dentes (Finger Joints)</span>
+              </label>
+              <label class="segment-option" id="opt-tslot">
+                <input type="radio" name="jointType" value="tslot">
+                <span>🔩 T-Slot (Parafusos e Porcas)</span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="jointType" value="flat">
+                <span>📏 Borda Lisa (Colar)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="input-row" id="finger-size-group">
+            <div class="label-with-value">
+              <label for="inp-tab-size">Largura do Dente:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-tab-size" min="5" max="50" value="15" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-tab-size" min="5" max="40" value="15" step="1" class="slider">
+          </div>
+
+          <div class="input-row" id="tslot-group" style="display: none;">
+            <div class="label-with-value">
+              <label for="sel-bolt-size">Padrão de Parafuso:</label>
+              <select id="sel-bolt-size" class="custom-select">
+                <option value="M3" selected>Parafuso M3 (3.2mm / Porca 5.5mm)</option>
+                <option value="M4">Parafuso M4 (4.2mm / Porca 7.0mm)</option>
+              </select>
+            </div>
+            <div class="label-with-value" style="margin-top: 8px;">
+              <label for="inp-bolt-len">Comprimento do Parafuso:</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-bolt-len" min="8" max="30" value="12" step="1">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-kerf">
+                Compensação de Kerf:
+                <span class="tooltip-trigger" title="Espessura da queima do laser. Padrão: 0.15mm">ⓘ</span>
+              </label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-kerf" min="0.0" max="0.5" value="0.15" step="0.01">
+                <span class="input-unit">mm</span>
+              </div>
+            </div>
+            <input type="range" id="range-kerf" min="0.0" max="0.4" value="0.15" step="0.01" class="slider">
+          </div>
+        </section>
+
+        <!-- CARD: DIVISÓRIAS INTERNAS -->
+        <section class="control-card" id="card-dividers">
+          <div class="card-header">
+            <h3>Divisórias Internas</h3>
+            <span class="unit-badge">Grade</span>
+          </div>
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-div-x">Divisórias em X (Colunas):</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-div-x" min="0" max="6" value="0" step="1">
+                <span class="input-unit">un</span>
+              </div>
+            </div>
+            <input type="range" id="range-div-x" min="0" max="6" value="0" step="1" class="slider">
+          </div>
+          <div class="input-row">
+            <div class="label-with-value">
+              <label for="inp-div-y">Divisórias em Y (Linhas):</label>
+              <div class="number-input-wrap">
+                <input type="number" id="inp-div-y" min="0" max="6" value="0" step="1">
+                <span class="input-unit">un</span>
+              </div>
+            </div>
+            <input type="range" id="range-div-y" min="0" max="6" value="0" step="1" class="slider">
+          </div>
+        </section>
+
+        <!-- CARD: FUROS E RECORTES -->
+        <section class="control-card" id="card-cutouts">
+          <div class="card-header">
+            <h3>Furos & Recortes</h3>
+            <button id="btn-add-cutout" class="mini-btn-add" title="Adicionar novo furo ou recorte">+ Adicionar</button>
+          </div>
+          <div id="cutouts-list-container" class="cutouts-list">
+            <p class="empty-list-text" id="empty-cutouts-msg">Nenhum furo adicionado. Clique em "+ Adicionar".</p>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- MAIN VIEWPORT DISPLAY AREA -->
+      <main class="main-viewport">
+
+        <!-- 3D VIEW CONTAINER -->
+        <div id="view-3d-wrapper" class="viewport-panel active">
+          <div id="canvas-container"></div>
+
+          <!-- 3D OVERLAY FLOATING CONTROLS -->
+          <div class="floating-controls-panel">
+            
+            <!-- CONTROLE DE ABERTURA DA TAMPA / DOBRADIÇA -->
+            <div class="overlay-row" id="row-lid-open">
+              <label for="slider-lid-angle" class="exploded-label">
+                🚪 Abrir Tampa:
+              </label>
+              <input type="range" id="slider-lid-angle" min="0" max="105" value="0" step="1" class="slider-accent slider-lid">
+              <span id="lid-angle-display" class="val-badge">0°</span>
+            </div>
+
+            <div class="overlay-divider"></div>
+
+            <!-- VISTA EXPLODIDA -->
+            <div class="overlay-row">
+              <label for="slider-exploded" class="exploded-label">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M15 3h6v6"></path>
+                  <path d="M9 21H3v-6"></path>
+                  <path d="M21 3l-7 7"></path>
+                  <path d="M3 21l7-7"></path>
+                </svg>
+                Explodir:
+              </label>
+              <input type="range" id="slider-exploded" min="0" max="60" value="0" step="1" class="slider-accent">
+              <span id="exploded-val-display" class="val-badge">0 mm</span>
+            </div>
+
+            <div class="overlay-divider"></div>
+
+            <!-- MATERIAIS -->
+            <div class="overlay-row">
+              <span class="overlay-caption">Material:</span>
+              <div class="material-pills">
+                <button class="mat-pill active" data-mat="wood">🪵 MDF / Madeira</button>
+                <button class="mat-pill" data-mat="acrylic">💎 Acrílico Cristal</button>
+                <button class="mat-pill" data-mat="dark">⬛ Dark Tech</button>
+              </div>
+            </div>
+
+            <div class="overlay-divider"></div>
+
+            <!-- AÇÕES DA CÂMERA -->
+            <div class="overlay-actions">
+              <button id="btn-autorotate" class="icon-action-btn" title="Ligar/Desligar Rotação Automática">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                </svg>
+                <span>Girar 360°</span>
+              </button>
+              <button id="btn-reset-cam" class="icon-action-btn" title="Resetar visualização da câmera">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                </svg>
+                <span>Centralizar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3D HUD INFO -->
+          <div class="hud-box-info">
+            <span class="hud-badge" id="hud-dims">140 x 70 x 100 mm</span>
+            <span class="hud-sub">Tampa: <strong id="hud-lid">🚪 Dobradiça Articulada</strong></span>
+          </div>
+
+          <div class="canvas-hint">
+            Arraste com o mouse para girar • Role para zoom • Ajuste o slider "Abrir Tampa" para ver a dobradiça girando!
+          </div>
+        </div>
+
+        <!-- 2D SHEET VIEW CONTAINER -->
+        <div id="view-2d-wrapper" class="viewport-panel">
+          <div class="sheet-toolbar">
+            <div class="sheet-info">
+              <span class="sheet-title">Chapa Planificada para Corte</span>
+              <span class="sheet-metric" id="sheet-area-calc">Dimensão Total: Calculando...</span>
+            </div>
+            <div class="sheet-options">
+              <label class="toggle-switch-label">
+                <input type="checkbox" id="chk-show-labels" checked>
+                <span>Gravar Etiquetas dos Nomes</span>
+              </label>
+              <div class="zoom-controls">
+                <button id="btn-zoom-in" class="zoom-btn" title="Aumentar Zoom">+</button>
+                <button id="btn-zoom-reset" class="zoom-btn" title="Resetar Zoom">100%</button>
+                <button id="btn-zoom-out" class="zoom-btn" title="Diminuir Zoom">-</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="svg-stage-container" id="svg-stage">
+            <div id="svg-preview-mount"></div>
+            <div class="canvas-hint" style="bottom: 50px;">
+              🖱️ Role a roda do mouse para Zoom • Arraste para mover a chapa
+            </div>
+          </div>
+
+          <!-- Legenda de Cores -->
+          <div class="laser-legend">
+            <div class="legend-item">
+              <span class="legend-color-box cut-line"></span>
+              <span>Linha Vermelha: <strong>Corte Vetorial (0.01mm)</strong></span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color-box engrave-line"></span>
+              <span>Linha Azul: <strong>Gravação de Textos / Guias</strong></span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color-box inner-cut-line"></span>
+              <span>Furos / Dobradiças: <strong>Corte Interno Primeiro</strong></span>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

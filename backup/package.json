@@ -1,0 +1,21 @@
+{
+  "name": "pobre-case",
+  "version": "1.0.0",
+  "description": "Gerador paramétrico de caixas e encaixes para corte a laser e CNC",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -l 3000 .",
+    "dev": "npx serve -l 3000 ."
+  },
+  "keywords": [
+    "laser-cut",
+    "box-generator",
+    "finger-joints",
+    "dxf",
+    "svg",
+    "cnc",
+    "makercase"
+  ],
+  "author": "cook45 & will",
+  "license": "MIT"
+}

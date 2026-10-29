@@ -627,3 +627,10 @@ Atender ao pedido da funcionalidade considerada mais importante pelo usuário: c
   - [render.yaml](file:///c:/Users/SEJUC/Documentos/pobre%20case/render.yaml): Blueprint do serviço web `pobrecase` no Render.
   - [.gitignore](file:///c:/Users/SEJUC/Documentos/pobre%20case/.gitignore): Proteção de arquivos locais.
 - **Repositório GitHub:** Criado automaticamente via API em `https://github.com/horaeverton734-del/pobrecase` e sincronizado na branch `main`.
+
+### 3. Alinhamento Trigonométrico e Fechamento das Quinas da Caixa Poligonal (`3` a `10` Lados)
+- **Arquivo alterado:** [app.js](file:///c:/Users/SEJUC/Documentos/pobre%20case/app.js#L921-L1094) (`generatePolyCapEdgePoints`, `buildPolyWallPolygon`, `getPolyData`, `update3DScene`, `getCuttingItems`)
+- **Alterações:**
+  - Extrusão 3D real (`THREE.ExtrudeGeometry`) das paredes poligonais com dentes de encaixe nas 4 bordas.
+  - Cálculo da projeção trigonométrica exata nos cantos verticais (`fingerDepth = T * Math.tan(Math.PI / N)`) para encaixe sem frestas em qualquer ângulo de 3 a 10 lados.
+  - Fechamento das quinas vivas da tampa e do fundo no raio externo real (`rOut = R + T / Math.cos(Math.PI / N)`), eliminando degraus ou furos triangulares nos vértices.

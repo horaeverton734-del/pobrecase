@@ -52,3 +52,4 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`[PobreCase PRO] Servidor ativo em http://${HOST}:${PORT}/`);
 });
+
