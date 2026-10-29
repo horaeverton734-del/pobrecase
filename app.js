@@ -997,7 +997,7 @@
     }
 
     const topEdge = state.hasLid ? 'female' : 'flat';
-    const wallPolygon = buildPolyWallPolygon(sideLen, H, topEdge, 'female', 'female', 'female', tabSize, T, K);
+    const wallPolygon = buildFacePolygon(sideLen, H, topEdge, 'male', 'female', 'female', tabSize, T, K);
     return { N, R, H, T, sideLen, baseVertices, polyContour, wallPolygon };
   }
 
@@ -1278,7 +1278,7 @@
     // --- MODO 2: CAIXA POLIGONAL ---
     else if (state.boxModel === 'poly') {
       const poly = getPolyData();
-      const { N, R, H, T, sideLen, polyContour } = poly;
+      const { N, R, H, T, sideLen, polyContour, wallPolygon } = poly;
 
       const polyCaps = state.hasLid ? ['bottom', 'top'] : ['bottom'];
       polyCaps.forEach(type => {
@@ -1293,18 +1293,32 @@
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 25), edgeMaterial));
         mesh.rotation.x = Math.PI / 2;
 
-        const yPos = (type === 'bottom' ? -H / 2 : H / 2) + (type === 'bottom' ? -exploded : exploded);
+        const baseCapY = (type === 'bottom') ? (-H / 2 + T / 2) : (H / 2 - T / 2);
+        const yPos = baseCapY + (type === 'bottom' ? -exploded : exploded);
         mesh.position.set(0, yPos, 0);
         mainMeshGroup.add(mesh);
       });
 
+      const wallShape = new THREE.Shape();
+      if (wallPolygon && wallPolygon.length > 0) {
+        const wCx = sideLen / 2;
+        const wCy = H / 2;
+        wallShape.moveTo(wallPolygon[0].x - wCx, wallPolygon[0].y - wCy);
+        for (let j = 1; j < wallPolygon.length; j++) {
+          wallShape.lineTo(wallPolygon[j].x - wCx, wallPolygon[j].y - wCy);
+        }
+        wallShape.closePath();
+      }
+      const wallGeom = new THREE.ExtrudeGeometry(wallShape, { depth: T, bevelEnabled: false });
+      wallGeom.translate(0, 0, -T / 2);
+      const wallEdgesGeom = new THREE.EdgesGeometry(wallGeom, 25);
+
       for (let i = 0; i < N; i++) {
-        const wallGeom = new THREE.BoxGeometry(sideLen, H, T);
         const wallMesh = new THREE.Mesh(wallGeom, meshMaterial);
-        wallMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(wallGeom, 25), edgeMaterial));
+        wallMesh.add(new THREE.LineSegments(wallEdgesGeom, edgeMaterial));
 
         const angle = (i * 2 * Math.PI) / N + Math.PI / N;
-        const distFromCenter = R * Math.cos(Math.PI / N) + exploded;
+        const distFromCenter = R * Math.cos(Math.PI / N) + T / 2 + exploded;
 
         wallMesh.position.set(Math.cos(angle) * distFromCenter, 0, Math.sin(angle) * distFromCenter);
         wallMesh.rotation.y = -angle + Math.PI / 2;

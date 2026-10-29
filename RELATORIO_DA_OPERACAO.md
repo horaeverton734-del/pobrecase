@@ -607,3 +607,23 @@ Atender ao pedido da funcionalidade considerada mais importante pelo usuário: c
 
 ### Tipo da alteração
 - Nova funcionalidade / Inicialização de Projeto
+
+
+---
+
+## [29/10/2026] — AJUSTE FINO DA DOBRADIÇA TRASEIRA (2 MM) E DEPLOY CLOUD NO RENDER
+
+**Engenheiros:** Clack & Cook45  
+**Status:** NO AR EM PRODUÇÃO (`https://pobrecase.onrender.com`)
+
+### 1. Ajuste Estético e Funcional do Vão Traseiro (`pin_hinge`)
+- **Arquivo alterado:** [app.js](file:///c:/Users/SEJUC/Documentos/pobre%20case/app.js#L439-L440) (`getMakerCaseHingeParams`)
+- **Alteração:** Reduzido o vão traseiro da tampa articulada de `7 mm` para exatamente **`2 mm`** (`Hlid_back = Math.max(T + 1, lidHeight - 2)`), deixando o fechamento traseiro muito mais limpo e alinhado, mantendo folga suficiente para o início do giro.
+
+### 2. Infraestrutura Cloud e Deploy (GitHub + Render)
+- **Arquivos criados:**
+  - [serve.cjs](file:///c:/Users/SEJUC/Documentos/pobre%20case/serve.cjs): Servidor HTTP Node.js zero-dependência para entrega rápida dos assets e suporte completo aos MIME types (`.svg`, `.dxf`, `.pdf`, `.js`, `.css`).
+  - [package.json](file:///c:/Users/SEJUC/Documentos/pobre%20case/package.json): Configuração de inicialização (`node serve.cjs`).
+  - [render.yaml](file:///c:/Users/SEJUC/Documentos/pobre%20case/render.yaml): Blueprint do serviço web `pobrecase` no Render.
+  - [.gitignore](file:///c:/Users/SEJUC/Documentos/pobre%20case/.gitignore): Proteção de arquivos locais.
+- **Repositório GitHub:** Criado automaticamente via API em `https://github.com/horaeverton734-del/pobrecase` e sincronizado na branch `main`.
