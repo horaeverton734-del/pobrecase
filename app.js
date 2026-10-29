@@ -1152,29 +1152,112 @@
     const W = state.hingeW;
     const H = state.hingeH;
     const D = state.hingeD;
-    const R = Math.min(state.hingeRadius, Math.min(W, D) * 0.45);
+    const R = Math.min(state.hingeRadius, Math.min(W, D) * 0.42);
     const T = state.thickness;
+    const K = state.kerf;
+    const tabSize = state.tabSize;
+    const kHalf = K / 2;
+    const hasLid = state.hasLid !== false;
+    const isFlat = (state.jointType === 'flat');
+
     const arcLen = (Math.PI / 2) * R;
     const straightX = Math.max(10, W - 2 * R);
     const straightZ = Math.max(10, D - 2 * R);
     const totalWrapperLen = 2 * straightX + 2 * straightZ + 4 * arcLen;
 
+    let countX = Math.max(3, Math.round(straightX / tabSize));
+    if (countX % 2 === 0) countX += 1;
+    const segX = straightX / countX;
+
+    let countZ = Math.max(3, Math.round(straightZ / tabSize));
+    if (countZ % 2 === 0) countZ += 1;
+    const segZ = straightZ / countZ;
+
     const capPts = [];
-    const steps = 12;
-    for (let i = -steps; i <= 0; i++) {
-      const a = (i / steps) * (Math.PI / 2);
+    const steps = 16;
+
+    // 1. Trecho Reto Traseiro (y = 0, x: R -> W - R, normal interna: +Y)
+    capPts.push({ x: R, y: 0 });
+    if (!isFlat) {
+      for (let i = 0; i < countX; i++) {
+        if (i % 2 === 1) {
+          const x0 = R + i * segX + kHalf;
+          const x1 = R + (i + 1) * segX - kHalf;
+          capPts.push({ x: x0, y: 0 });
+          capPts.push({ x: x0, y: T });
+          capPts.push({ x: x1, y: T });
+          capPts.push({ x: x1, y: 0 });
+        }
+      }
+    }
+    capPts.push({ x: W - R, y: 0 });
+
+    // Arco 1: Canto Traseiro-Direito (centro: W - R, R; ângulo -PI/2 -> 0)
+    for (let i = 1; i <= steps; i++) {
+      const a = -Math.PI / 2 + (i / steps) * (Math.PI / 2);
       capPts.push({ x: W - R + R * Math.cos(a), y: R + R * Math.sin(a) });
     }
-    for (let i = 0; i <= steps; i++) {
+
+    // 2. Trecho Reto Direito (x = W, y: R -> D - R, normal interna: -X)
+    if (!isFlat) {
+      for (let i = 0; i < countZ; i++) {
+        if (i % 2 === 1) {
+          const y0 = R + i * segZ + kHalf;
+          const y1 = R + (i + 1) * segZ - kHalf;
+          capPts.push({ x: W, y: y0 });
+          capPts.push({ x: W - T, y: y0 });
+          capPts.push({ x: W - T, y: y1 });
+          capPts.push({ x: W, y: y1 });
+        }
+      }
+    }
+    capPts.push({ x: W, y: D - R });
+
+    // Arco 2: Canto Frontal-Direito (centro: W - R, D - R; ângulo 0 -> PI/2)
+    for (let i = 1; i <= steps; i++) {
       const a = (i / steps) * (Math.PI / 2);
       capPts.push({ x: W - R + R * Math.cos(a), y: D - R + R * Math.sin(a) });
     }
-    for (let i = steps; i <= steps * 2; i++) {
-      const a = (i / steps) * (Math.PI / 2);
+
+    // 3. Trecho Reto Frontal (y = D, x: W - R -> R, normal interna: -Y)
+    if (!isFlat) {
+      for (let i = countX - 1; i >= 0; i--) {
+        if (i % 2 === 1) {
+          const x1 = R + (i + 1) * segX - kHalf;
+          const x0 = R + i * segX + kHalf;
+          capPts.push({ x: x1, y: D });
+          capPts.push({ x: x1, y: D - T });
+          capPts.push({ x: x0, y: D - T });
+          capPts.push({ x: x0, y: D });
+        }
+      }
+    }
+    capPts.push({ x: R, y: D });
+
+    // Arco 3: Canto Frontal-Esquerdo (centro: R, D - R; ângulo PI/2 -> PI)
+    for (let i = 1; i <= steps; i++) {
+      const a = Math.PI / 2 + (i / steps) * (Math.PI / 2);
       capPts.push({ x: R + R * Math.cos(a), y: D - R + R * Math.sin(a) });
     }
-    for (let i = steps * 2; i <= steps * 3; i++) {
-      const a = (i / steps) * (Math.PI / 2);
+
+    // 4. Trecho Reto Esquerdo (x = 0, y: D - R -> R, normal interna: +X)
+    if (!isFlat) {
+      for (let i = countZ - 1; i >= 0; i--) {
+        if (i % 2 === 1) {
+          const y1 = R + (i + 1) * segZ - kHalf;
+          const y0 = R + i * segZ + kHalf;
+          capPts.push({ x: 0, y: y1 });
+          capPts.push({ x: T, y: y1 });
+          capPts.push({ x: T, y: y0 });
+          capPts.push({ x: 0, y: y0 });
+        }
+      }
+    }
+    capPts.push({ x: 0, y: R });
+
+    // Arco 4: Canto Traseiro-Esquerdo (centro: R, R; ângulo PI -> 3*PI/2)
+    for (let i = 1; i < steps; i++) {
+      const a = Math.PI + (i / steps) * (Math.PI / 2);
       capPts.push({ x: R + R * Math.cos(a), y: R + R * Math.sin(a) });
     }
 
@@ -1188,7 +1271,166 @@
     curOffset += arcLen + straightZ;
     hingeZones.push({ start: curOffset, width: arcLen });
 
-    return { W, H, D, R, T, capPts, totalWrapperLen, hingeZones };
+    return {
+      W, H, D, R, T, K, tabSize, hasLid,
+      arcLen, straightX, straightZ, countX, countZ, segX, segZ,
+      capPts: cleanPolygonPoints(capPts), totalWrapperLen, hingeZones
+    };
+  }
+
+  // Constrói o polígono 2D/3D de uma parede reta do Estojo Cantos Curvos (com dentes machos no topo e fundo)
+  function buildHingeStraightWallPolygon(len, count, H, T, K, hasLid) {
+    if (state.jointType === 'flat') {
+      return [
+        { x: 0, y: T },
+        { x: len, y: T },
+        { x: len, y: hasLid ? H - T : H },
+        { x: 0, y: hasLid ? H - T : H }
+      ];
+    }
+    const seg = len / count;
+    const kHalf = K / 2;
+    const yBot = T;
+    const yTop = hasLid ? (H - T) : H;
+    const pts = [];
+
+    // Base (X: 0 -> len), dentes machos descem até y = 0 nos ímpares
+    pts.push({ x: 0, y: yBot });
+    for (let i = 0; i < count; i++) {
+      if (i % 2 === 1) {
+        const x0 = i * seg - kHalf;
+        const x1 = (i + 1) * seg + kHalf;
+        pts.push({ x: x0, y: yBot });
+        pts.push({ x: x0, y: 0 });
+        pts.push({ x: x1, y: 0 });
+        pts.push({ x: x1, y: yBot });
+      }
+    }
+    pts.push({ x: len, y: yBot });
+
+    // Topo (X: len -> 0), dentes machos sobem até y = H nos ímpares
+    pts.push({ x: len, y: yTop });
+    if (hasLid) {
+      for (let i = count - 1; i >= 0; i--) {
+        if (i % 2 === 1) {
+          const x1 = (i + 1) * seg + kHalf;
+          const x0 = i * seg - kHalf;
+          pts.push({ x: x1, y: yTop });
+          pts.push({ x: x1, y: H });
+          pts.push({ x: x0, y: H });
+          pts.push({ x: x0, y: yTop });
+        }
+      }
+    }
+    pts.push({ x: 0, y: yTop });
+
+    return cleanPolygonPoints(pts);
+  }
+
+  // Constrói o contorno completo da Fita Flexível 2D (Living Hinge) com dentes machos no topo, base e extremidades
+  function buildHingeWrapperStripPolygon(hData, isStripB = false) {
+    const { H, T, K, tabSize, hasLid, arcLen, straightX, straightZ, countX, countZ, segX, segZ } = hData;
+    const halfLen = straightX + arcLen + straightZ + arcLen;
+    const yBot = T;
+    const yTop = hasLid ? (H - T) : H;
+    const kHalf = K / 2;
+
+    if (state.jointType === 'flat') {
+      return [
+        { x: 0, y: yBot },
+        { x: halfLen, y: yBot },
+        { x: halfLen, y: yTop },
+        { x: 0, y: yTop }
+      ];
+    }
+
+    const pts = [];
+
+    // 1. Aresta Inferior (X: 0 -> halfLen)
+    pts.push({ x: 0, y: yBot });
+    // Dentes do trecho straightX (0 .. straightX)
+    for (let i = 0; i < countX; i++) {
+      if (i % 2 === 1) {
+        const x0 = i * segX - kHalf;
+        const x1 = (i + 1) * segX + kHalf;
+        pts.push({ x: x0, y: yBot });
+        pts.push({ x: x0, y: 0 });
+        pts.push({ x: x1, y: 0 });
+        pts.push({ x: x1, y: yBot });
+      }
+    }
+    // Dentes do trecho straightZ (straightX + arcLen .. straightX + arcLen + straightZ)
+    const offsetZ = straightX + arcLen;
+    for (let i = 0; i < countZ; i++) {
+      if (i % 2 === 1) {
+        const x0 = offsetZ + i * segZ - kHalf;
+        const x1 = offsetZ + (i + 1) * segZ + kHalf;
+        pts.push({ x: x0, y: yBot });
+        pts.push({ x: x0, y: 0 });
+        pts.push({ x: x1, y: 0 });
+        pts.push({ x: x1, y: yBot });
+      }
+    }
+    pts.push({ x: halfLen, y: yBot });
+
+    // 2. Aresta Direita (Y: yBot -> yTop) com dentes de união da cinta
+    const vSpan = yTop - yBot;
+    let countH = Math.max(3, Math.round(vSpan / tabSize));
+    if (countH % 2 === 0) countH += 1;
+    const segH = vSpan / countH;
+    for (let j = 0; j < countH; j++) {
+      const y0 = yBot + j * segH;
+      const y1 = yBot + (j + 1) * segH;
+      const isTab = isStripB ? (j % 2 === 1) : (j % 2 === 0);
+      if (isTab) {
+        pts.push({ x: halfLen, y: y0 });
+        pts.push({ x: halfLen + T, y: y0 });
+        pts.push({ x: halfLen + T, y: y1 });
+        pts.push({ x: halfLen, y: y1 });
+      }
+    }
+    pts.push({ x: halfLen, y: yTop });
+
+    // 3. Aresta Superior (X: halfLen -> 0)
+    if (hasLid) {
+      for (let i = countZ - 1; i >= 0; i--) {
+        if (i % 2 === 1) {
+          const x1 = offsetZ + (i + 1) * segZ + kHalf;
+          const x0 = offsetZ + i * segZ - kHalf;
+          pts.push({ x: x1, y: yTop });
+          pts.push({ x: x1, y: H });
+          pts.push({ x: x0, y: H });
+          pts.push({ x: x0, y: yTop });
+        }
+      }
+      for (let i = countX - 1; i >= 0; i--) {
+        if (i % 2 === 1) {
+          const x1 = (i + 1) * segX + kHalf;
+          const x0 = i * segX - kHalf;
+          pts.push({ x: x1, y: yTop });
+          pts.push({ x: x1, y: H });
+          pts.push({ x: x0, y: H });
+          pts.push({ x: x0, y: yTop });
+        }
+      }
+    }
+    pts.push({ x: 0, y: yTop });
+
+    // 4. Aresta Esquerda (Y: yTop -> yBot) com cavas/dentes complementares
+    for (let j = countH - 1; j >= 0; j--) {
+      const y0 = yBot + j * segH;
+      const y1 = yBot + (j + 1) * segH;
+      const isRecess = isStripB ? (j % 2 === 0) : (j % 2 === 1);
+      if (isRecess) {
+        pts.push({ x: 0, y: y1 });
+        pts.push({ x: T, y: y1 });
+        pts.push({ x: T, y: y0 });
+        pts.push({ x: 0, y: y0 });
+      }
+    }
+    pts.push({ x: 0, y: yBot });
+
+    return cleanPolygonPoints(pts);
   }
 
   // ==========================================================================
@@ -1476,9 +1718,9 @@
     // --- MODO 3: CANTOS CURVOS (LIVING HINGE) ---
     else if (state.boxModel === 'hinge') {
       const hData = getHingeData();
-      const { W, H, D, T, capPts } = hData;
+      const { W, H, D, R, T, K, hasLid, straightX, straightZ, countX, countZ, capPts } = hData;
 
-      const hingeCaps = state.hasLid ? ['bottom', 'top'] : ['bottom'];
+      const hingeCaps = hasLid ? ['bottom', 'top'] : ['bottom'];
       hingeCaps.forEach(type => {
         const shape = new THREE.Shape();
         shape.moveTo(capPts[0].x - W / 2, capPts[0].y - D / 2);
@@ -1491,28 +1733,106 @@
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 25), edgeMaterial));
         mesh.rotation.x = Math.PI / 2;
 
-        const yPos = (type === 'bottom' ? -H / 2 : H / 2) + (type === 'bottom' ? -exploded : exploded);
+        const baseCapY = (type === 'bottom') ? (-H / 2 + T / 2) : (H / 2 - T / 2);
+        const yPos = baseCapY + (type === 'bottom' ? -exploded : exploded);
         mesh.position.set(0, yPos, 0);
         mainMeshGroup.add(mesh);
       });
 
-      const bodyShape = new THREE.Shape();
-      bodyShape.moveTo(capPts[0].x - W / 2, capPts[0].y - D / 2);
-      for (let i = 1; i < capPts.length; i++) bodyShape.lineTo(capPts[i].x - W / 2, capPts[i].y - D / 2);
-      bodyShape.closePath();
+      // 1. As 4 Paredes Retas com Dentes Machos no Topo e Fundo
+      const wallXPoly = buildHingeStraightWallPolygon(straightX, countX, H, T, K, hasLid);
+      const shapeX = new THREE.Shape();
+      shapeX.moveTo(wallXPoly[0].x - straightX / 2, wallXPoly[0].y - H / 2);
+      for (let i = 1; i < wallXPoly.length; i++) shapeX.lineTo(wallXPoly[i].x - straightX / 2, wallXPoly[i].y - H / 2);
+      shapeX.closePath();
+      const geomX = new THREE.ExtrudeGeometry(shapeX, { depth: T, bevelEnabled: false });
+      geomX.translate(0, 0, -T / 2);
+      const edgesX = new THREE.EdgesGeometry(geomX, 25);
 
-      const innerHole = new THREE.Path();
-      innerHole.moveTo((capPts[0].x - W / 2) * 0.96, (capPts[0].y - D / 2) * 0.96);
-      for (let i = 1; i < capPts.length; i++) innerHole.lineTo((capPts[i].x - W / 2) * 0.96, (capPts[i].y - D / 2) * 0.96);
-      innerHole.closePath();
-      bodyShape.holes.push(innerHole);
+      // Parede Traseira e Frontal
+      [-D / 2 + T / 2, D / 2 - T / 2].forEach(zPos => {
+        const m = new THREE.Mesh(geomX, meshMaterial);
+        m.add(new THREE.LineSegments(edgesX, edgeMaterial));
+        m.position.set(0, 0, zPos);
+        mainMeshGroup.add(m);
+      });
 
-      const bodyGeom = new THREE.ExtrudeGeometry(bodyShape, { depth: H - 2 * T, bevelEnabled: false });
-      bodyGeom.translate(0, 0, -(H - 2 * T) / 2);
-      const bodyMesh = new THREE.Mesh(bodyGeom, meshMaterial);
-      bodyMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeom, 25), edgeMaterial));
-      bodyMesh.rotation.x = Math.PI / 2;
-      mainMeshGroup.add(bodyMesh);
+      const wallZPoly = buildHingeStraightWallPolygon(straightZ, countZ, H, T, K, hasLid);
+      const shapeZ = new THREE.Shape();
+      shapeZ.moveTo(wallZPoly[0].x - straightZ / 2, wallZPoly[0].y - H / 2);
+      for (let i = 1; i < wallZPoly.length; i++) shapeZ.lineTo(wallZPoly[i].x - straightZ / 2, wallZPoly[i].y - H / 2);
+      shapeZ.closePath();
+      const geomZ = new THREE.ExtrudeGeometry(shapeZ, { depth: T, bevelEnabled: false });
+      geomZ.translate(0, 0, -T / 2);
+      const edgesZ = new THREE.EdgesGeometry(geomZ, 25);
+
+      // Parede Direita e Esquerda
+      [W / 2 - T / 2, -W / 2 + T / 2].forEach(xPos => {
+        const m = new THREE.Mesh(geomZ, meshMaterial);
+        m.add(new THREE.LineSegments(edgesZ, edgeMaterial));
+        m.rotation.y = -Math.PI / 2;
+        m.position.set(xPos, 0, 0);
+        mainMeshGroup.add(m);
+      });
+
+      // 2. Os 4 Cantos Curvos (Living Hinge) com Fendas de Flexão Visíveis no 3D
+      const yBot = -H / 2 + T;
+      const yTop = hasLid ? (H / 2 - T) : (H / 2);
+      const cornerH = Math.max(4, yTop - yBot);
+      const cornerCenterY = (yBot + yTop) / 2;
+      const rIn = Math.max(2, R - T);
+      const arcSteps = 16;
+
+      const corners = [
+        { cx: W / 2 - R, cz: -D / 2 + R, aStart: -Math.PI / 2 },
+        { cx: W / 2 - R, cz:  D / 2 - R, aStart: 0 },
+        { cx: -W / 2 + R, cz: D / 2 - R, aStart: Math.PI / 2 },
+        { cx: -W / 2 + R, cz: -D / 2 + R, aStart: Math.PI }
+      ];
+
+      corners.forEach(c => {
+        const cShape = new THREE.Shape();
+        for (let i = 0; i <= arcSteps; i++) {
+          const a = c.aStart + (i / arcSteps) * (Math.PI / 2);
+          const px = c.cx + R * Math.cos(a);
+          const py = c.cz + R * Math.sin(a);
+          if (i === 0) cShape.moveTo(px, py);
+          else cShape.lineTo(px, py);
+        }
+        for (let i = arcSteps; i >= 0; i--) {
+          const a = c.aStart + (i / arcSteps) * (Math.PI / 2);
+          const px = c.cx + rIn * Math.cos(a);
+          const py = c.cz + rIn * Math.sin(a);
+          cShape.lineTo(px, py);
+        }
+        cShape.closePath();
+
+        const cGeom = new THREE.ExtrudeGeometry(cShape, { depth: cornerH, bevelEnabled: false });
+        cGeom.translate(0, 0, -cornerH / 2);
+        const cMesh = new THREE.Mesh(cGeom, meshMaterial);
+        cMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(cGeom, 25), edgeMaterial));
+        cMesh.rotation.x = Math.PI / 2;
+        cMesh.position.set(0, cornerCenterY, 0);
+        mainMeshGroup.add(cMesh);
+
+        // Linhas verticais do Living Hinge na superfície externa do canto curvo
+        const slitPoints = [];
+        const slitCount = 9;
+        for (let s = 1; s < slitCount; s++) {
+          const a = c.aStart + (s / slitCount) * (Math.PI / 2);
+          const sx = c.cx + (R + 0.15) * Math.cos(a);
+          const sz = c.cz + (R + 0.15) * Math.sin(a);
+          if (s % 2 === 0) {
+            slitPoints.push(new THREE.Vector3(sx, yBot, sz));
+            slitPoints.push(new THREE.Vector3(sx, yBot + cornerH * 0.82, sz));
+          } else {
+            slitPoints.push(new THREE.Vector3(sx, yBot + cornerH * 0.18, sz));
+            slitPoints.push(new THREE.Vector3(sx, yTop, sz));
+          }
+        }
+        const slitGeom = new THREE.BufferGeometry().setFromPoints(slitPoints);
+        mainMeshGroup.add(new THREE.LineSegments(slitGeom, edgeMaterial));
+      });
     }
   }
 
@@ -1606,13 +1926,16 @@
     // --- 3. CANTOS CURVOS ---
     else if (state.boxModel === 'hinge') {
       const hData = getHingeData();
-      const { W, H, D, capPts, totalWrapperLen, hingeZones } = hData;
+      const { W, H, D, T, hasLid, capPts, totalWrapperLen, hingeZones } = hData;
       items.push({ id: 'hinge-bottom', name: 'Fundo Curvo', width: W, height: D, polygon: capPts, holes: [], isDivider: false });
-      if (state.hasLid) {
+      if (hasLid) {
         items.push({ id: 'hinge-top', name: 'Tampa Curva', width: W, height: D, polygon: capPts, holes: [], isDivider: false });
       }
 
       const halfLen = totalWrapperLen / 2;
+      const yBot = T;
+      const yTop = hasLid ? (H - T) : H;
+      const bodyH = Math.max(4, yTop - yBot);
       const hingeHoles = [];
       hingeZones.forEach(zone => {
         const slitSpacing = 2.5;
@@ -1620,14 +1943,15 @@
         for (let s = 0; s < slitCount; s++) {
           const slitX = zone.start + s * slitSpacing;
           if (slitX < halfLen) {
-            if (s % 2 === 0) hingeHoles.push({ type: 'rect', x: slitX, y: 0, w: 0.2, h: H * 0.8 });
-            else hingeHoles.push({ type: 'rect', x: slitX, y: H * 0.2, w: 0.2, h: H * 0.8 });
+            if (s % 2 === 0) hingeHoles.push({ type: 'rect', x: slitX, y: yBot, w: 0.2, h: bodyH * 0.8 });
+            else hingeHoles.push({ type: 'rect', x: slitX, y: yBot + bodyH * 0.2, w: 0.2, h: bodyH * 0.8 });
           }
         }
       });
-      const wrapperPts = [{ x: 0, y: 0 }, { x: halfLen, y: 0 }, { x: halfLen, y: H }, { x: 0, y: H }];
-      items.push({ id: 'hinge-wrap-1', name: 'Fita Flexível A (Living Hinge)', width: halfLen, height: H, polygon: wrapperPts, holes: hingeHoles, isDivider: false });
-      items.push({ id: 'hinge-wrap-2', name: 'Fita Flexível B (Living Hinge)', width: halfLen, height: H, polygon: wrapperPts, holes: hingeHoles, isDivider: false });
+      const wrapperPtsA = buildHingeWrapperStripPolygon(hData, false);
+      const wrapperPtsB = buildHingeWrapperStripPolygon(hData, true);
+      items.push({ id: 'hinge-wrap-1', name: 'Fita Flexível A (Living Hinge)', width: halfLen + T, height: H, polygon: wrapperPtsA, holes: hingeHoles, isDivider: false });
+      items.push({ id: 'hinge-wrap-2', name: 'Fita Flexível B (Living Hinge)', width: halfLen + T, height: H, polygon: wrapperPtsB, holes: hingeHoles, isDivider: false });
     }
 
     return items;
