@@ -634,3 +634,9 @@ Atender ao pedido da funcionalidade considerada mais importante pelo usuário: c
   - Extrusão 3D real (`THREE.ExtrudeGeometry`) das paredes poligonais com dentes de encaixe nas 4 bordas.
   - Cálculo da projeção trigonométrica exata nos cantos verticais (`fingerDepth = T * Math.tan(Math.PI / N)`) para encaixe sem frestas em qualquer ângulo de 3 a 10 lados.
   - Fechamento das quinas vivas da tampa e do fundo no raio externo real (`rOut = R + T / Math.cos(Math.PI / N)`), eliminando degraus ou furos triangulares nos vértices.
+
+### 4. Dentes de Encaixe nas Laterais da Tampa Articulada e no Estojo Cantos Curvos (`Living Hinge`)
+- **Arquivo alterado:** [app.js](file:///c:/Users/SEJUC/Documentos/pobre%20case/app.js) (`buildLidFrontPolygon`, `buildLidBackPolygon`, `buildMakerCaseArmRightPolygon`, `getHingeData`, `buildHingeStraightWallPolygon`, `buildHingeWrapperStripPolygon`, `update3DScene`, `getCuttingItems`)
+- **Alterações:**
+  - Adicionados dentes laterais de travamento entre a frente/traseira da tampa articulada (`lid_front` e `lid_back`) e os braços laterais (`lid_left` e `lid_right`).
+  - Adicionados dentes de encaixe nos 4 trechos retos do **Estojo Cantos Curvos (`hinge`)** (tampa curva, fundo curvo e fitas flexíveis A/B) e renderização 3D das fendas de flexão (*Living Hinge*) nos 4 cantos arredondados.
