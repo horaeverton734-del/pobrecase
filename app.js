@@ -539,8 +539,8 @@
     return cleanPolygonPoints(pts);
   }
 
-  // Constrói a Frente da Tampa (Lid Front)
-  function buildLidFrontPolygon(W, lidHeight, tabSize, thickness, kerf) {
+  // Constrói a Frente da Tampa (Lid Front) com dentes no topo E dentes machos nas laterais esquerda/direita
+  function buildLidFrontPolygon(lidWidth, W, lidHeight, tabSize, thickness, kerf) {
     const pts = [];
     const kHalf = kerf / 2;
 
@@ -548,40 +548,51 @@
     if (countW % 2 === 0) countW += 1;
     const segLenW = W / countW;
 
-    // 1. Fundo reto (Y = 0, X: 0 -> W)
-    pts.push({ x: 0, y: 0 });
-    pts.push({ x: W, y: 0 });
+    const vH = Math.max(3, lidHeight - thickness);
+    const vSeg = vH / 3;
 
-    // 2. Lateral direita reta (X = W, Y: 0 -> lidHeight - thickness)
-    pts.push({ x: W, y: lidHeight - thickness });
+    // 1. Fundo reto (Y = 0, X: thickness -> W + thickness)
+    pts.push({ x: thickness, y: 0 });
+    pts.push({ x: W + thickness, y: 0 });
 
-    // 3. Topo com dentes machos que entram nas cavas de lid_top (X: W -> 0)
+    // 2. Lateral direita com dente macho central que trava no braço direito (Y: 0 -> lidHeight - thickness)
+    pts.push({ x: W + thickness, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: lidWidth, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: lidWidth, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: W + thickness, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: W + thickness, y: vH });
+
+    // 3. Topo com dentes machos que entram nas cavas de lid_top (X: W + thickness -> thickness)
     for (let i = countW - 1; i >= 0; i--) {
-      const s0 = i * segLenW;
-      const s1 = (i + 1) * segLenW;
+      const s0 = thickness + i * segLenW;
+      const s1 = thickness + (i + 1) * segLenW;
       const isTab = (i % 2 === 0);
       if (isTab) {
-        const x0 = (i === 0) ? 0 : (s0 - kHalf);
-        const x1 = (i === countW - 1) ? W : (s1 + kHalf);
-        pts.push({ x: x1, y: lidHeight - thickness });
+        const x0 = (i === 0) ? thickness : (s0 - kHalf);
+        const x1 = (i === countW - 1) ? (W + thickness) : (s1 + kHalf);
+        pts.push({ x: x1, y: vH });
         pts.push({ x: x1, y: lidHeight });
         pts.push({ x: x0, y: lidHeight });
-        pts.push({ x: x0, y: lidHeight - thickness });
+        pts.push({ x: x0, y: vH });
       } else {
-        pts.push({ x: s1, y: lidHeight - thickness });
-        pts.push({ x: s0, y: lidHeight - thickness });
+        pts.push({ x: s1, y: vH });
+        pts.push({ x: s0, y: vH });
       }
     }
 
-    // 4. Lateral esquerda reta (X = 0, Y: lidHeight - thickness -> 0)
-    pts.push({ x: 0, y: lidHeight - thickness });
-    pts.push({ x: 0, y: 0 });
+    // 4. Lateral esquerda com dente macho central que trava no braço esquerdo (Y: lidHeight - thickness -> 0)
+    pts.push({ x: thickness, y: vH });
+    pts.push({ x: thickness, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: 0, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: 0, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: thickness, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: thickness, y: 0 });
 
     return cleanPolygonPoints(pts);
   }
 
-  // Constrói o Trás da Tampa (Lid Back)
-  function buildLidBackPolygon(W, Hlid_back, tabSize, thickness, kerf) {
+  // Constrói o Trás da Tampa (Lid Back) com dentes no topo E dentes machos nas laterais esquerda/direita
+  function buildLidBackPolygon(lidWidth, W, Hlid_back, tabSize, thickness, kerf) {
     const pts = [];
     const kHalf = kerf / 2;
 
@@ -589,34 +600,45 @@
     if (countW % 2 === 0) countW += 1;
     const segLenW = W / countW;
 
-    // 1. Fundo reto (Y = 0, X: 0 -> W)
-    pts.push({ x: 0, y: 0 });
-    pts.push({ x: W, y: 0 });
+    const vH = Math.max(2, Hlid_back - thickness);
+    const vSeg = vH / 3;
 
-    // 2. Lateral direita reta (X = W, Y: 0 -> Hlid_back - thickness)
-    pts.push({ x: W, y: Hlid_back - thickness });
+    // 1. Fundo reto (Y = 0, X: thickness -> W + thickness)
+    pts.push({ x: thickness, y: 0 });
+    pts.push({ x: W + thickness, y: 0 });
 
-    // 3. Topo com dentes machos que entram nas cavas traseiras de lid_top (X: W -> 0)
+    // 2. Lateral direita com dente macho central que trava no braço direito (Y: 0 -> Hlid_back - thickness)
+    pts.push({ x: W + thickness, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: lidWidth, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: lidWidth, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: W + thickness, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: W + thickness, y: vH });
+
+    // 3. Topo com dentes machos que entram nas cavas traseiras de lid_top (X: W + thickness -> thickness)
     for (let i = countW - 1; i >= 0; i--) {
-      const s0 = i * segLenW;
-      const s1 = (i + 1) * segLenW;
+      const s0 = thickness + i * segLenW;
+      const s1 = thickness + (i + 1) * segLenW;
       const isTab = (i % 2 === 0);
       if (isTab) {
-        const x0 = (i === 0) ? 0 : (s0 - kHalf);
-        const x1 = (i === countW - 1) ? W : (s1 + kHalf);
-        pts.push({ x: x1, y: Hlid_back - thickness });
+        const x0 = (i === 0) ? thickness : (s0 - kHalf);
+        const x1 = (i === countW - 1) ? (W + thickness) : (s1 + kHalf);
+        pts.push({ x: x1, y: vH });
         pts.push({ x: x1, y: Hlid_back });
         pts.push({ x: x0, y: Hlid_back });
-        pts.push({ x: x0, y: Hlid_back - thickness });
+        pts.push({ x: x0, y: vH });
       } else {
-        pts.push({ x: s1, y: Hlid_back - thickness });
-        pts.push({ x: s0, y: Hlid_back - thickness });
+        pts.push({ x: s1, y: vH });
+        pts.push({ x: s0, y: vH });
       }
     }
 
-    // 4. Lateral esquerda reta (X = 0, Y: Hlid_back - thickness -> 0)
-    pts.push({ x: 0, y: Hlid_back - thickness });
-    pts.push({ x: 0, y: 0 });
+    // 4. Lateral esquerda com dente macho central que trava no braço esquerdo (Y: Hlid_back - thickness -> 0)
+    pts.push({ x: thickness, y: vH });
+    pts.push({ x: thickness, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: 0, y: Math.min(vH, 2 * vSeg + kHalf) });
+    pts.push({ x: 0, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: thickness, y: Math.max(0, vSeg - kHalf) });
+    pts.push({ x: thickness, y: 0 });
 
     return cleanPolygonPoints(pts);
   }
@@ -633,6 +655,13 @@
     if (countD % 2 === 0) countD += 1;
     const segLenD = spanD / countD;
     const kHalf = kerf / 2;
+
+    const vHFront = Math.max(3, lidHeight - thickness);
+    const vSegFront = vHFront / 3;
+
+    const yBackBot = Harm - Hlid_back;
+    const vHBack = Math.max(2, Hlid_back - thickness);
+    const vSegBack = vHBack / 3;
 
     const pts = [];
 
@@ -658,11 +687,18 @@
       });
     }
 
-    // 5. Subida vertical traseira lisa até o topo (+Y)
+    // 5. Subida vertical traseira com cava fêmea para o dente lateral de lid_back (+Y)
+    const yBackSlot0 = Math.max(yp, yBackBot + vSegBack + kHalf);
+    const yBackSlot1 = Math.min(Harm - thickness, yBackBot + 2 * vSegBack - kHalf);
+    if (yBackSlot1 > yBackSlot0) {
+      pts.push({ x: D, y: yBackSlot0 });
+      pts.push({ x: D - thickness, y: yBackSlot0 });
+      pts.push({ x: D - thickness, y: yBackSlot1 });
+      pts.push({ x: D, y: yBackSlot1 });
+    }
     pts.push({ x: D, y: Harm });
 
     // 6. Aresta superior: de trás (X = D) para a frente (X = 0) no sentido CCW (-X)
-    // Trecho de X = D até X = D - thickness: liso a Y = Harm (onde a tampa traseira encosta)
     pts.push({ x: D - thickness, y: Harm });
 
     // Cavas fêmea que recebem os dentes machos de lid_top (j de countD - 1 até 0)
@@ -683,11 +719,16 @@
       }
     }
 
-    // Trecho de X = thickness até X = 0: liso a Y = Harm (onde a tampa frontal encosta)
     pts.push({ x: thickness, y: Harm });
     pts.push({ x: 0, y: Harm });
 
-    // 7. Aresta frontal lisa descendo até a base da saia (-Y)
+    // 7. Aresta frontal descendo com cava fêmea para o dente lateral de lid_front (-Y)
+    const yFrontSlot1 = skirtBottomY + 2 * vSegFront - kHalf;
+    const yFrontSlot0 = skirtBottomY + vSegFront + kHalf;
+    pts.push({ x: 0, y: yFrontSlot1 });
+    pts.push({ x: thickness, y: yFrontSlot1 });
+    pts.push({ x: thickness, y: yFrontSlot0 });
+    pts.push({ x: 0, y: yFrontSlot0 });
     pts.push({ x: 0, y: skirtBottomY });
 
     return cleanPolygonPoints(pts);
@@ -766,15 +807,15 @@
           enabled: state.faces.top !== false, isLid: true
         },
         lid_front: {
-          id: 'lid_front', name: 'Frente da Tampa', width: W, height: lidHeight,
-          polygon: buildLidFrontPolygon(W, lidHeight, tabSize, T, K),
+          id: 'lid_front', name: 'Frente da Tampa', width: lidWidth, height: lidHeight,
+          polygon: buildLidFrontPolygon(lidWidth, W, lidHeight, tabSize, T, K),
           internalHoles: [],
           normal: [0, 0, 1], pos3D: [0, -H / 2 + Hbase + lidHeight / 2, D / 2], rot3D: [0, 0, 0],
           enabled: state.faces.top !== false, isLid: true
         },
         lid_back: {
-          id: 'lid_back', name: 'Trás da Tampa', width: W, height: Hlid_back,
-          polygon: buildLidBackPolygon(W, Hlid_back, tabSize, T, K),
+          id: 'lid_back', name: 'Trás da Tampa', width: lidWidth, height: Hlid_back,
+          polygon: buildLidBackPolygon(lidWidth, W, Hlid_back, tabSize, T, K),
           internalHoles: [],
           normal: [0, 0, -1], pos3D: [0, -H / 2 + Hbase + lidHeight - Hlid_back / 2, -D / 2], rot3D: [0, Math.PI, 0],
           enabled: state.faces.top !== false, isLid: true
